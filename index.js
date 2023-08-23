@@ -1,111 +1,58 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
-const mongo = require('mongodb');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const idgenerator = require('idgenerator');
+const validUrl = require('valid-url');
 const app = express();
-const urlVal = require('urlval');
+
+// app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
 
-// db connection
-mongoose.connect(process.env.MONGO_URI, { 
-useNewUrlParser: true, 
-useUnifiedTopology: true });
-
-mongoose.connection.on('error')
-
-// url model
-const shortUrlSchema = new mongoose.Schema({
-  original_url : {
-    type: String,
-    required: true
-  },
-  short_url : {
-    type: String,
-    required: true
-  }
-});
-const Url = mongoose.model('Url', shortUrlSchema);
-
-app.use(bodyParser.urlencoded({
-  extended: false
-}))
-
 app.use(cors());
+
 app.use('/public', express.static(`${process.cwd()}/public`));
-app.use(express.json())
+
 app.get('/', function(req, res) {
   res.sendFile(process.cwd() + '/views/index.html');
 });
 
+// In-memory storage for URL mappings
+const urlMap = {};
+let nextShortId = 1;
 
-// Your first API endpoint
-app.get('/api/hello', function(req, res) {
-  res.json({ greeting: 'hello API' });
+// Function to generate a custom short URL
+function generateShortUrl() {
+  return nextShortId++;
+}
+
+// Route to handle shortening URLs
+app.post('/api/shorturl', (req, res) => {
+  const originalUrl = req.body.url;
+
+  if (!validUrl.isWebUri(originalUrl)) {
+    return res.json({ error: 'Invalid URL' });
+  }
+
+  const shortUrl = generateShortUrl();
+  urlMap[shortUrl] = originalUrl;
+
+  res.json({ original_url: originalUrl, short_url: shortUrl });
 });
 
-// post request
-app.post('(api/shorturl', async (req, res) => {
-  const bodyUrl = req.body.url
-  const urlGen = idgenerator.generate()
+// Route to handle redirection
+app.get('/api/shorturl/:shortUrl', (req, res) => {
+  const shortUrl = req.params.shortUrl;
 
-  if(!urlVal.isWebUrl(bodyUrl)) {
-    res.status(200).json({
-      error: 'URL Invalid'
-    })
-  } else {
-    try {
-      let findOne = await URL.findOne({
-        original_url: bodyUrl
-      })
-
-      if(findOne) {
-        res.json({
-          original_url: findOne.original_url,
-          short_url: findOne.short_url
-        })
-
-      } else {
-        findOne = new Url({
-          original_url: findOne.original_url,
-          short_url: urlGen
-        })
-
-        await findOne.save()
-
-        res.json({
-          original_url: findOne.original_url,
-          short_url: findOne.short_url
-        })
-      }
-
-    } catch (err) {
-      res.status(500).json('server error')
-    }
+  const originalUrl = urlMap[shortUrl];
+  if (!originalUrl) {
+    return res.json({ error: 'Short URL not found' });
   }
-})
 
-// get method
-app.get('/api/shorturl/:id', async (req, res) => {
-  try {
-    const urlParams = await Url.findOne({
-      short_url: req.params.id
-    })
-
-    if(urlParams){
-      return res.redirect(urlParams.original_url)
-    } else {
-      return res.status(404).json('URL not found')
-    }
-  } catch(err) {
-    res.status(500).json('server error')
-  }
-})
-
+  res.redirect(originalUrl);
+});
 
 app.listen(port, function() {
   console.log(`Listening on port ${port}`);
