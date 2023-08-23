@@ -11,7 +11,9 @@
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
-    "express": "^5.0.0"
+    "express": "^5.0.0",
+    "mongodb": "^3.7.3",
+    "mongoose": "^5.13.15"
   },
   "license": "MIT",
   "devDependencies": {
