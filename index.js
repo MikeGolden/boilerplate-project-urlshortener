@@ -19,63 +19,41 @@ app.get('/api/hello', function(req, res) {
   res.json({ greeting: 'hello API' });
 });
 
-// post request
-app.post('(api/shorturl', async (req, res) => {
-  const bodyUrl = req.body.url
-  const urlGen = idgenerator.generate()
+// post shorturl endpoint
+app.post("/api/shorturl", function (req, res) {
+  // get original and short url
+  var originalUrl = req.body.url;
+  var shortUrl = Math.floor(Math.random() * 100) + 1;
+  let errorResponse = { error: "invalid url" };
 
-  if(!urlVal.isWebUrl(bodyUrl)) {
-    res.status(200).json({
-      error: 'URL Invalid'
-    })
-  } else {
-    try {
-      let findOne = await URL.findOne({
-        original_url: bodyUrl
-      })
+  try {
+    // create an url object
+    var url = new URL(originalUrl);
 
-      if(findOne) {
-        res.json({
-          original_url: findOne.original_url,
-          short_url: findOne.short_url
-        })
-
-      } else {
-        findOne = new Url({
-          original_url: findOne.original_url,
-          short_url: urlGen
-        })
-
-        await findOne.save()
-
-        res.json({
-          original_url: findOne.original_url,
-          short_url: findOne.short_url
-        })
+    dns.lookup(url.hostname, (err, address, family) => {
+      if (err) return res.json(errorResponse);
+      // check if key already exists, if so generate new key
+      while (shortUrl.toString() in urls) {
+        shortUrl = Math.floor(Math.random() * 100) + 1;
       }
 
-    } catch (err) {
-      res.status(500).json('server error')
-    }
+      let data = { original_url: originalUrl, short_url: shortUrl };
+      urls[shortUrl] = originalUrl;
+      // send data
+      res.json(data);
+    });
+  } catch (err) {
+    res.json(errorResponse);
   }
-})
+});
 
-// get method
-app.get('/api/shorturl/:id', async (req, res) => {
-  try {
-    const urlParams = await Url.findOne({
-      short_url: req.params.id
-    })
+app.get("/api/shorturl/:short_url", (req, res) => {
+  let key = req.params.short_url;
+  var originalUrl = urls[key];
 
-    if(urlParams){
-      return res.redirect(urlParams.original_url)
-    } else {
-      return res.status(404).json('URL not found')
-    }
-  } catch(err) {
-    res.status(500).json('server error')
-  }
-})
+  // redirect to original url
+  res.redirect(originalUrl);
+});
 
 app.listen(port, function() {
   console.log(`Listening on port ${port}`);
